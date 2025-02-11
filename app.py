@@ -121,7 +121,7 @@ def create_blog():
         db = get_db()
         db.execute(
             "INSERT INTO blogs (title, content, author, email) VALUES (?, ?, ?, ?)",
-            (title, content, author,email),
+            (title, content, author, email),
         )
         db.commit()
 
@@ -152,6 +152,19 @@ def delete_blog(blog_id):
         db.commit()
 
     return redirect("/homepage")
+
+
+@app.route("/my_blogs")
+def my_blogs():
+    if "email" not in session:
+        return redirect("/login")
+
+    db = get_db()
+    user_blogs = db.execute(
+        "SELECT * FROM blogs WHERE author = ?", (session["name"],)
+    ).fetchall()
+
+    return render_template("user_blog.html", blogs=user_blogs)
 
 
 @app.route("/logout")
