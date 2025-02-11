@@ -10,8 +10,6 @@
 </head>
 
 <body>
-
-
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="/homepage">FlaskBlog</a>
@@ -42,7 +40,13 @@
                 <h5 class="card-title">{{ blog.title }}</h5>
                 <p class="card-text">{{ blog.content }}</p>
                 <small class="text-muted">By {{ blog.author }}</small>
+                {% if session['email'] == blog.email %}
+                <form action="/delete_blog/{{ blog.id }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger btn-sm float-end">Delete</button>
+                </form>
+                {% endif %}
             </div>
+
         </div>
         {% endfor %}
     </div>

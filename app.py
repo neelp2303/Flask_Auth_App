@@ -30,11 +30,14 @@ def init_db():
             )
         """
         )
-        cursor.execute('''CREATE TABLE IF NOT EXISTS blogs (
+        cursor.execute(
+            """CREATE TABLE IF NOT EXISTS blogs (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         title TEXT NOT NULL,
                         content TEXT NOT NULL,
-                        author TEXT NOT NULL)''')
+                        author TEXT NOT NULL,
+                        email TEXT NOT NULL)"""
+        )
         conn.commit()
         # conn.close()
 
@@ -85,6 +88,7 @@ def login():
             password.encode("utf-8"), user["password"].encode("utf-8")
         ):
             session["email"] = user["email"]
+            session["name"] = user["name"]
             return redirect("/homepage")
         else:
             return render_template("login.html", error="Invalid credentials")
@@ -112,12 +116,12 @@ def create_blog():
     if request.method == "POST":
         title = request.form["title"]
         content = request.form["content"]
-        author = session["email"]
-
+        author = session["name"]
+        email = session["email"]
         db = get_db()
         db.execute(
-            "INSERT INTO blogs (title, content, author) VALUES (?, ?, ?)",
-            (title, content, author),
+            "INSERT INTO blogs (title, content, author, email) VALUES (?, ?, ?, ?)",
+            (title, content, author,email),
         )
         db.commit()
 
@@ -128,12 +132,27 @@ def create_blog():
 
 @app.route("/homepage")
 def homepage():
-    if 'email' in session:
+    if "email" in session:
         db = get_db()
         blogs = db.execute("SELECT * FROM blogs ORDER BY id DESC").fetchall()
     return render_template("homepage.html", blogs=blogs)
 
-        
+
+@app.route("/delete_blog/<int:blog_id>", methods=["POST"])
+def delete_blog(blog_id):
+    if "email" not in session:
+        return redirect("/login")
+
+    db = get_db()
+    blog = db.execute("SELECT * FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+
+    # Ensure the logged-in user is the author
+    if blog and blog["email"] == session["email"]:
+        db.execute("DELETE FROM blogs WHERE id = ?", (blog_id,))
+        db.commit()
+
+    return redirect("/homepage")
+
 
 @app.route("/logout")
 def logout():
