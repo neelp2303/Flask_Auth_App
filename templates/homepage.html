@@ -36,13 +36,14 @@
         <h2 class="text-center mb-4 fw-bold">Recent Blogs</h2>
 
         {% for blog in blogs %}
-        <div class="card mb-4 shadow-lg border-0 rounded-3 p-3">
-            <div class="row g-3 align-items-center">
+        <div class="card mb-4 shadow-lg p-3">
+            <div class="row g-3 align-items">
                 <h3 class="fw-semibold">{{ blog.title }}</h3>
                 <!-- Blog Image (Left) -->
                 {% if blog.image %}
                 <div class="col-md-3">
-                    <img src="{{ url_for('get_image', blog_id=blog.id) }}" class="img-fluid rounded" alt="Blog Image">
+                    <img src="{{ url_for('get_image', blog_id=blog.id) }}" class="img-fluid rounded mb-3"
+                        alt="Blog Image">
                 </div>
                 {% endif %}
 
@@ -50,18 +51,20 @@
                 <div class="col-md-9">
 
 
-                    <p class="card-text mt-0">{{ blog.content }}</p>
+                    <p class="card-text mt-0 mb-3">{{ blog.content }}</p>
 
 
                 </div>
             </div>
+            <div>{% if session['email'] == blog.email %}
+                <form action="/delete_blog/{{ blog.id }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger btn-sm float-end">Delete</button>
+                </form>
+                <a href="/edit_blog/{{ blog.id }}" class="btn btn-success btn-sm float-end me-2">Edit</a>
+                {% endif %}
+                <small class="text-muted">By {{ blog.author }}</small>
+            </div>
 
-            {% if session['email'] == blog.email %}
-            <form action="/delete_blog/{{ blog.id }}" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-danger btn-sm float-end">Delete</button>
-            </form>
-            {% endif %}
-            <small class="text-muted">By {{ blog.author }}</small>
         </div>
 
         {% endfor %}

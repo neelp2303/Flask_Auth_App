@@ -61,6 +61,31 @@ def get_image(blog_id):
 
     return "No Image", 404
 
+@app.route("/edit_blog/<int:blog_id>", methods=["GET", "POST"])
+def edit_blog(blog_id):
+    if "email" not in session:
+        return redirect("/login")
+    db = get_db()
+    blog = db.execute("SELECT * FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+    if request.method == "POST":
+        title = request.form["title"]
+        content = request.form["content"]
+
+        image_data = None
+        if "image" in request.files:
+            image = request.files["image"]
+            if image and image.filename != "":
+                image_data = image.read()
+
+        if blog and blog["email"] == session["email"]:
+            db.execute(
+                "UPDATE blogs SET title = ?, content = ?, image = ? WHERE id = ?",
+                (title, content, image_data, blog_id),
+            )
+            db.commit()
+        return redirect("/homepage")
+
+    return render_template("edit_blog.html",blog=blog)
 
 @app.route("/")
 def index():
