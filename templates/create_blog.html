@@ -30,17 +30,23 @@
 
     <div class="container mt-5">
         <h2 class="text-center">Write a New Blog</h2>
-        <form action="/create_blog" method="POST">
-            <div class="mb-3">
-                <label class="form-label">Title:</label>
-                <input type="text" class="form-control" name="title" required>
+        <form action="/create_blog" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="title">Title:</label>
+                <input type="text" class="form-control" id="title" name="title" required>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Content:</label>
-                <textarea class="form-control" name="content" rows="5" required></textarea>
+            <div class="form-group">
+                <label for="content">Content:</label>
+                <textarea class="form-control" id="content" name="content" rows="4" required></textarea>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Publish</button>
+            <div class="form-group">
+                <label for="image">Upload Image:</label>
+                <input type="file" class="form-control" id="image" name="image" accept="image/*">
+            </div>
+            <br>
+            <button type="submit" class="btn btn-primary">Post Blog</button>
         </form>
+
     </div>
 
 </body>

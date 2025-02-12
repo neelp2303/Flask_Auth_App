@@ -33,23 +33,41 @@
     </nav>
 
     <div class="container mt-5">
-        <h2 class="text-center mb-4">Recent Blogs</h2>
+        <h2 class="text-center mb-4 fw-bold">Recent Blogs</h2>
+
         {% for blog in blogs %}
-        <div class="card mb-4 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">{{ blog.title }}</h5>
-                <p class="card-text">{{ blog.content }}</p>
-                <small class="text-muted">By {{ blog.author }}</small>
-                {% if session['email'] == blog.email %}
-                <form action="/delete_blog/{{ blog.id }}" method="POST" class="d-inline">
-                    <button type="submit" class="btn btn-danger btn-sm float-end">Delete</button>
-                </form>
+        <div class="card mb-4 shadow-lg border-0 rounded-3 p-3">
+            <div class="row g-3 align-items-center">
+                <h3 class="fw-semibold">{{ blog.title }}</h3>
+                <!-- Blog Image (Left) -->
+                {% if blog.image %}
+                <div class="col-md-3">
+                    <img src="{{ url_for('get_image', blog_id=blog.id) }}" class="img-fluid rounded" alt="Blog Image">
+                </div>
                 {% endif %}
+
+                <!-- Blog Content (Right) -->
+                <div class="col-md-9">
+
+
+                    <p class="card-text mt-0">{{ blog.content }}</p>
+
+
+                </div>
             </div>
 
+            {% if session['email'] == blog.email %}
+            <form action="/delete_blog/{{ blog.id }}" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-danger btn-sm float-end">Delete</button>
+            </form>
+            {% endif %}
+            <small class="text-muted">By {{ blog.author }}</small>
         </div>
+
         {% endfor %}
     </div>
+
+
 
 </body>
 

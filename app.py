@@ -1,10 +1,12 @@
-from flask import Flask, request, render_template, redirect, session, g
+import io
+from flask import Flask, request, render_template, redirect, send_file, session, g
 import sqlite3
 import bcrypt  # type: ignore
+from flask_ngrok import run_with_ngrok
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
-
+# run_with_ngrok(app)
 DATABASE = "database.db"
 
 
@@ -36,13 +38,28 @@ def init_db():
                         title TEXT NOT NULL,
                         content TEXT NOT NULL,
                         author TEXT NOT NULL,
-                        email TEXT NOT NULL)"""
+                        email TEXT NOT NULL,
+                        image BLOB
+                        )"""
         )
         conn.commit()
         # conn.close()
 
 
 init_db()
+
+
+@app.route("/get_image/<int:blog_id>")
+def get_image(blog_id):
+    db = get_db()
+    blog = db.execute("SELECT image FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+
+    if blog and blog["image"]:
+        return send_file(
+            io.BytesIO(blog["image"]), mimetype="image/jpeg", as_attachment=False
+        )
+
+    return "No Image", 404
 
 
 @app.route("/")
@@ -118,10 +135,19 @@ def create_blog():
         content = request.form["content"]
         author = session["name"]
         email = session["email"]
+
+        # Handle image upload
+        image_data = None
+        if "image" in request.files:
+            image = request.files["image"]
+            if image and image.filename != "":
+                image_data = image.read()  # Read image as binary data
+
+        # Insert blog into database with image
         db = get_db()
         db.execute(
-            "INSERT INTO blogs (title, content, author, email) VALUES (?, ?, ?, ?)",
-            (title, content, author, email),
+            "INSERT INTO blogs (title, content, author, email, image) VALUES (?, ?, ?, ?, ?)",
+            (title, content, author, email, image_data),
         )
         db.commit()
 
