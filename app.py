@@ -253,17 +253,13 @@ def create_blog():
         category_id = request.form["category"]
         selected_tags = request.form.getlist("tags")
 
-        # Handle image upload
         image_filename = None
         if "image" in request.files:
             image = request.files["image"]
             if image and image.filename != "":
                 filename = secure_filename(image.filename)
                 image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-                image_filename = filename  # Read image as binary data
-
-        # Insert blog into database with image
-
+                image_filename = filename  
         # db.execute(
         #     "INSERT INTO blogs (title, content, author, email, image_filename) VALUES (?, ?, ?, ?, ?)",
         #     (title, content, author, email, image_filename),
@@ -274,9 +270,9 @@ def create_blog():
             "INSERT INTO blogs (title, content, author, email, image_filename, category_id) VALUES (?, ?, ?, ?, ?, ?)",
             (title, content, author, email, image_filename, category_id),
         )
-        blog_id = cursor.lastrowid  # Get the newly inserted blog's ID
+        blog_id = cursor.lastrowid  #  new blog's ID
 
-        # Insert tags into blog_tags association table
+        # Insert tags into blog_tags 
         for tag_id in selected_tags:
             cursor.execute(
                 "INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)",
