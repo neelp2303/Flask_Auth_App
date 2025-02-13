@@ -60,14 +60,17 @@ def init_db():
                         )
         """
         )
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL
             )
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS blog_tags (
                 blog_id INTEGER,
                 tag_id INTEGER,
@@ -75,7 +78,8 @@ def init_db():
                 FOREIGN KEY (blog_id) REFERENCES blogs(id) ON DELETE CASCADE,
                 FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
         conn.commit()
         # conn.close()
@@ -94,11 +98,16 @@ def edit_blog(blog_id):
     if "email" not in session:
         return redirect("/login")
     db = get_db()
-    
+
     blog = db.execute("SELECT * FROM blogs WHERE id = ?", (blog_id,)).fetchone()
     categories = db.execute("SELECT * FROM categories").fetchall()
     tags = db.execute("SELECT * FROM tags").fetchall()
-    selected_tags = [row["tag_id"] for row in db.execute("SELECT tag_id FROM blog_tags WHERE blog_id = ?", (blog_id,)).fetchall()]
+    selected_tags = [
+        row["tag_id"]
+        for row in db.execute(
+            "SELECT tag_id FROM blog_tags WHERE blog_id = ?", (blog_id,)
+        ).fetchall()
+    ]
     if request.method == "POST":
         title = request.form["title"]
         content = request.form["content"]
@@ -120,11 +129,50 @@ def edit_blog(blog_id):
             )
             db.execute("DELETE FROM blog_tags WHERE blog_id = ?", (blog_id,))
             for tag_id in new_tags:
-                db.execute("INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)", (blog_id, tag_id))
+                db.execute(
+                    "INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)",
+                    (blog_id, tag_id),
+                )
             db.commit()
         return redirect("/homepage")
 
-    return render_template("edit_blog.html", blog=blog,categories=categories, tags=tags, selected_tags=selected_tags)
+    return render_template(
+        "edit_blog.html",
+        blog=blog,
+        categories=categories,
+        tags=tags,
+        selected_tags=selected_tags,
+    )
+
+
+@app.route("/blog_details/<int:blog_id>")
+def blog_details(blog_id):
+    db = get_db()
+    blog = db.execute(
+        """
+        SELECT blogs.*, categories.name as category_name 
+        FROM blogs 
+        LEFT JOIN categories ON blogs.category_id = categories.id 
+        WHERE blogs.id = ?
+        """,
+        (blog_id,),
+    ).fetchone()
+    if not blog:
+        return redirect("/homepage")
+
+    tags = [
+        row["name"]
+        for row in db.execute(
+            """
+    SELECT tags.name FROM tags 
+    INNER JOIN blog_tags ON tags.id = blog_tags.tag_id 
+    WHERE blog_tags.blog_id = ?
+    """,
+            (blog_id,),
+        ).fetchall()
+    ]
+
+    return render_template("blog_details.html", blog=blog, tags=tags)
 
 
 @app.route("/")
@@ -215,7 +263,7 @@ def create_blog():
                 image_filename = filename  # Read image as binary data
 
         # Insert blog into database with image
-        
+
         # db.execute(
         #     "INSERT INTO blogs (title, content, author, email, image_filename) VALUES (?, ?, ?, ?, ?)",
         #     (title, content, author, email, image_filename),
@@ -230,32 +278,40 @@ def create_blog():
 
         # Insert tags into blog_tags association table
         for tag_id in selected_tags:
-            cursor.execute("INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)", (blog_id, tag_id))
+            cursor.execute(
+                "INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)",
+                (blog_id, tag_id),
+            )
 
         db.commit()
         return redirect("/homepage")
 
-    return render_template("create_blog.html",categories=categories,tags=tags)
+    return render_template("create_blog.html", categories=categories, tags=tags)
 
 
 @app.route("/homepage")
 def homepage():
     if "email" in session:
         db = get_db()
-        blogs = db.execute("""
+        blogs = db.execute(
+            """
             SELECT blogs.*, categories.name as category_name 
             FROM blogs 
             LEFT JOIN categories ON blogs.category_id = categories.id 
             ORDER BY blogs.id DESC
-        """).fetchall()
+        """
+        ).fetchall()
         blog_tags = {}
         for blog in blogs:
-            blog_tags[blog["id"]] = db.execute("""
+            blog_tags[blog["id"]] = db.execute(
+                """
                 SELECT tags.name FROM tags 
                 INNER JOIN blog_tags ON tags.id = blog_tags.tag_id 
                 WHERE blog_tags.blog_id = ?
-            """, (blog["id"],)).fetchall()
-    return render_template("homepage.html", blogs=blogs,blog_tags=blog_tags)
+            """,
+                (blog["id"],),
+            ).fetchall()
+    return render_template("homepage.html", blogs=blogs, blog_tags=blog_tags)
 
 
 @app.route("/delete_blog/<int:blog_id>", methods=["POST"])
