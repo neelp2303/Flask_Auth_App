@@ -18,6 +18,18 @@
                     <li class="nav-item">
                         <a class="nav-link btn btn-dark mx-2" href="/homepage">Home</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-dark " href="/create_blog">Create Blog</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-dark mx-2" href="/my_blogs">My Blogs</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-dark" href="/dashboard">Profile</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-danger" href="/logout">Logout</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -31,13 +43,26 @@
             </div>
             <div class="form-group">
                 <label for="content">Content:</label>
-                <textarea class="form-control" id="content" name="content" rows="4" required>{{ blog.content }}</textarea>
+                <textarea class="form-control" id="content" name="content" rows="4"
+                    required>{{ blog.content }}</textarea>
             </div>
             <div class="form-group">
                 <label for="image">Upload Image:</label>
                 <input type="file" class="form-control" id="image" name="image" accept="image/*">
             </div>
             <br>
+            <label for="category">Category:</label>
+            <select name="category" required>
+                {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label>Tags:</label>
+            {% for tag in tags %}
+            <input type="checkbox" name="tags" value="{{ tag.id }}" {% if tag.id in selected_tags %}checked{% endif %}>
+            {{ tag.name }}
+            {% endfor %}
             <button type="submit" class="btn btn-primary">Update Blog</button>
         </form>
 

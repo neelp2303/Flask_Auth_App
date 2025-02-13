@@ -1,13 +1,19 @@
 import io
+import os
 from flask import Flask, request, render_template, redirect, send_file, session, g
 import sqlite3
 import bcrypt  # type: ignore
 from flask_ngrok import run_with_ngrok
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = "uploads"
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
-# run_with_ngrok(app)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 DATABASE = "database.db"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 # Function to get database connection
@@ -33,15 +39,44 @@ def init_db():
         """
         )
         cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+            )
+        """
+        )
+        cursor.execute(
             """CREATE TABLE IF NOT EXISTS blogs (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         title TEXT NOT NULL,
                         content TEXT NOT NULL,
                         author TEXT NOT NULL,
                         email TEXT NOT NULL,
-                        image BLOB
-                        )"""
+                        image_filename TEXT,
+                        category_id INTEGER,
+                        FOREIGN KEY (category_id) REFERENCES categories(id)
+            
+                        )
+        """
         )
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blog_tags (
+                blog_id INTEGER,
+                tag_id INTEGER,
+                PRIMARY KEY (blog_id, tag_id),
+                FOREIGN KEY (blog_id) REFERENCES blogs(id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+            )
+        """)
+
         conn.commit()
         # conn.close()
 
@@ -49,43 +84,48 @@ def init_db():
 init_db()
 
 
-@app.route("/get_image/<int:blog_id>")
-def get_image(blog_id):
-    db = get_db()
-    blog = db.execute("SELECT image FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+@app.route("/get_image/<filename>")
+def get_image(filename):
+    return send_file(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
-    if blog and blog["image"]:
-        return send_file(
-            io.BytesIO(blog["image"]), mimetype="image/jpeg", as_attachment=False
-        )
-
-    return "No Image", 404
 
 @app.route("/edit_blog/<int:blog_id>", methods=["GET", "POST"])
 def edit_blog(blog_id):
     if "email" not in session:
         return redirect("/login")
     db = get_db()
+    
     blog = db.execute("SELECT * FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+    categories = db.execute("SELECT * FROM categories").fetchall()
+    tags = db.execute("SELECT * FROM tags").fetchall()
+    selected_tags = [row["tag_id"] for row in db.execute("SELECT tag_id FROM blog_tags WHERE blog_id = ?", (blog_id,)).fetchall()]
     if request.method == "POST":
         title = request.form["title"]
         content = request.form["content"]
+        category_id = request.form["category"]
+        new_tags = request.form.getlist("tags")
 
-        image_data = None
+        image_filename = blog["image_filename"]  # Keep old filename by default
         if "image" in request.files:
             image = request.files["image"]
             if image and image.filename != "":
-                image_data = image.read()
+                filename = secure_filename(image.filename)
+                image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+                image_filename = filename  # Update with new filename
 
         if blog and blog["email"] == session["email"]:
             db.execute(
-                "UPDATE blogs SET title = ?, content = ?, image = ? WHERE id = ?",
-                (title, content, image_data, blog_id),
+                "UPDATE blogs SET title = ?, content = ?, image_filename = ?, category_id = ? WHERE id = ?",
+                (title, content, image_filename, category_id, blog_id),
             )
+            db.execute("DELETE FROM blog_tags WHERE blog_id = ?", (blog_id,))
+            for tag_id in new_tags:
+                db.execute("INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)", (blog_id, tag_id))
             db.commit()
         return redirect("/homepage")
 
-    return render_template("edit_blog.html",blog=blog)
+    return render_template("edit_blog.html", blog=blog,categories=categories, tags=tags, selected_tags=selected_tags)
+
 
 @app.route("/")
 def index():
@@ -154,39 +194,68 @@ def dashboard():
 def create_blog():
     if "email" not in session:
         return redirect("/login")
-
+    db = get_db()
+    categories = db.execute("SELECT * FROM categories").fetchall()
+    tags = db.execute("SELECT * FROM tags").fetchall()
     if request.method == "POST":
         title = request.form["title"]
         content = request.form["content"]
         author = session["name"]
         email = session["email"]
+        category_id = request.form["category"]
+        selected_tags = request.form.getlist("tags")
 
         # Handle image upload
-        image_data = None
+        image_filename = None
         if "image" in request.files:
             image = request.files["image"]
             if image and image.filename != "":
-                image_data = image.read()  # Read image as binary data
+                filename = secure_filename(image.filename)
+                image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+                image_filename = filename  # Read image as binary data
 
         # Insert blog into database with image
-        db = get_db()
-        db.execute(
-            "INSERT INTO blogs (title, content, author, email, image) VALUES (?, ?, ?, ?, ?)",
-            (title, content, author, email, image_data),
+        
+        # db.execute(
+        #     "INSERT INTO blogs (title, content, author, email, image_filename) VALUES (?, ?, ?, ?, ?)",
+        #     (title, content, author, email, image_filename),
+        # )
+        # db.commit()
+        cursor = db.cursor()
+        cursor.execute(
+            "INSERT INTO blogs (title, content, author, email, image_filename, category_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (title, content, author, email, image_filename, category_id),
         )
-        db.commit()
+        blog_id = cursor.lastrowid  # Get the newly inserted blog's ID
 
+        # Insert tags into blog_tags association table
+        for tag_id in selected_tags:
+            cursor.execute("INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)", (blog_id, tag_id))
+
+        db.commit()
         return redirect("/homepage")
 
-    return render_template("create_blog.html")
+    return render_template("create_blog.html",categories=categories,tags=tags)
 
 
 @app.route("/homepage")
 def homepage():
     if "email" in session:
         db = get_db()
-        blogs = db.execute("SELECT * FROM blogs ORDER BY id DESC").fetchall()
-    return render_template("homepage.html", blogs=blogs)
+        blogs = db.execute("""
+            SELECT blogs.*, categories.name as category_name 
+            FROM blogs 
+            LEFT JOIN categories ON blogs.category_id = categories.id 
+            ORDER BY blogs.id DESC
+        """).fetchall()
+        blog_tags = {}
+        for blog in blogs:
+            blog_tags[blog["id"]] = db.execute("""
+                SELECT tags.name FROM tags 
+                INNER JOIN blog_tags ON tags.id = blog_tags.tag_id 
+                WHERE blog_tags.blog_id = ?
+            """, (blog["id"],)).fetchall()
+    return render_template("homepage.html", blogs=blogs,blog_tags=blog_tags)
 
 
 @app.route("/delete_blog/<int:blog_id>", methods=["POST"])
@@ -224,5 +293,6 @@ def logout():
     return redirect("/login")
 
 
+# run_with_ngrok(app)
 if __name__ == "__main__":
     app.run(debug=True)
