@@ -293,25 +293,8 @@ def create_blog():
 def homepage():
     if "email" in session:
         db = get_db()
-        blogs = db.execute(
-            """
-            SELECT blogs.*, categories.name as category_name 
-            FROM blogs 
-            LEFT JOIN categories ON blogs.category_id = categories.id 
-            ORDER BY blogs.id DESC
-        """
-        ).fetchall()
-        blog_tags = {}
-        for blog in blogs:
-            blog_tags[blog["id"]] = db.execute(
-                """
-                SELECT tags.name FROM tags 
-                INNER JOIN blog_tags ON tags.id = blog_tags.tag_id 
-                WHERE blog_tags.blog_id = ?
-            """,
-                (blog["id"],),
-            ).fetchall()
-    return render_template("homepage.html", blogs=blogs, blog_tags=blog_tags)
+        blogs = db.execute("SELECT * FROM blogs ORDER BY id DESC").fetchall()
+    return render_template("homepage.html", blogs=blogs)
 
 
 @app.route("/delete_blog/<int:blog_id>", methods=["POST"])
