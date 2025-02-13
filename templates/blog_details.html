@@ -10,7 +10,7 @@
     <style>
         body {
 
-            padding-top: 25px;
+            padding-top: 50px;
         }
 
         .centered-card {
@@ -59,10 +59,11 @@
         </div>
     </nav>
 
-    <div class="container d-flex justify-content-center align-items-center" style="min-height: 100vh;">
-        <div class="card centered-card  ">
+    <div class="container d-flex justify-content-center">
+        <div class="card centered-card w-100 mx-3 mx-md-5 mt-4" style="max-width: 600px;">
             {% if blog.image_filename %}
-            <img src="{{ url_for('get_image', filename=blog.image_filename) }}" class="blog-image" alt="Blog Image">
+            <img src="{{ url_for('get_image', filename=blog.image_filename) }}" class="blog-image img-fluid"
+                alt="Blog Image">
             {% endif %}
 
             <div class="card-body">
@@ -71,13 +72,11 @@
                 <hr>
                 <p class="mt-3">{{ blog.content }}</p>
                 <hr>
-                <small class="text-muted">Tags: {% for tag in tags %}
-                    {{ tag }}{% if not loop.last %},
-                    {% endif %}
-                    {%endfor %}</small>
+                <p>Tags: {% for tag in tags %} #{{ tag }}{% if not loop.last %}, {% endif %} {% endfor %}</p>
             </div>
         </div>
     </div>
+
 </body>
 
 </html>
