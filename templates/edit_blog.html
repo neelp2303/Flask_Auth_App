@@ -36,7 +36,7 @@
     </nav>
     <div class="container mt-5">
         <h2 class="text-center">Edit Your Blog</h2>
-        <form action="/edit_blog/{{ blog.id }}" method="POST" enctype="multipart/form-data">
+        <form action="/edit_blog/{{ blog.slug }}" method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="title">Title:</label>
                 <input type="text" class="form-control" id="title" name="title" value="{{ blog.title }}" required>

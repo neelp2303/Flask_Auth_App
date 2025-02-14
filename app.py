@@ -5,6 +5,7 @@ import sqlite3
 import bcrypt  # type: ignore
 from flask_ngrok import run_with_ngrok
 from werkzeug.utils import secure_filename
+from slugify import slugify  # type: ignore
 
 UPLOAD_FOLDER = "uploads"
 
@@ -53,6 +54,7 @@ def init_db():
                         content TEXT NOT NULL,
                         author TEXT NOT NULL,
                         email TEXT NOT NULL,
+                        slug TEXT,
                         image_filename TEXT,
                         category_id INTEGER,
                         FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -93,48 +95,52 @@ def get_image(filename):
     return send_file(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
 
-@app.route("/edit_blog/<int:blog_id>", methods=["GET", "POST"])
-def edit_blog(blog_id):
+@app.route("/edit_blog/<slug>", methods=["GET", "POST"])
+def edit_blog(slug):
     if "email" not in session:
         return redirect("/login")
     db = get_db()
 
-    blog = db.execute("SELECT * FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+    blog = db.execute("SELECT * FROM blogs WHERE slug = ?", (slug,)).fetchone()
+    if blog is None:
+        return "Blog not found", 404
     categories = db.execute("SELECT * FROM categories").fetchall()
     tags = db.execute("SELECT * FROM tags").fetchall()
     selected_tags = [
         row["tag_id"]
         for row in db.execute(
-            "SELECT tag_id FROM blog_tags WHERE blog_id = ?", (blog_id,)
+            "SELECT tag_id FROM blog_tags WHERE blog_id = ?", (blog["id"],)
         ).fetchall()
     ]
+
     if request.method == "POST":
         title = request.form["title"]
+        new_slug = slugify(title)  # Update slug if title changes
         content = request.form["content"]
         category_id = request.form["category"]
         new_tags = request.form.getlist("tags")
 
-        image_filename = blog["image_filename"]  # Keep old filename by default
+        image_filename = blog["image_filename"]
         if "image" in request.files:
             image = request.files["image"]
             if image and image.filename != "":
                 filename = secure_filename(image.filename)
                 image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-                image_filename = filename  # Update with new filename
+                image_filename = filename
 
         if blog and blog["email"] == session["email"]:
             db.execute(
-                "UPDATE blogs SET title = ?, content = ?, image_filename = ?, category_id = ? WHERE id = ?",
-                (title, content, image_filename, category_id, blog_id),
+                "UPDATE blogs SET title = ?, slug = ?, content = ?, image_filename = ?, category_id = ? WHERE slug = ?",
+                (title, new_slug, content, image_filename, category_id, slug),
             )
-            db.execute("DELETE FROM blog_tags WHERE blog_id = ?", (blog_id,))
+            db.execute("DELETE FROM blog_tags WHERE blog_id = ?", (blog["id"],))
             for tag_id in new_tags:
                 db.execute(
                     "INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)",
-                    (blog_id, tag_id),
+                    (blog["id"], tag_id),
                 )
             db.commit()
-        return redirect("/homepage")
+        return redirect(f"/blog/{new_slug}")
 
     return render_template(
         "edit_blog.html",
@@ -145,18 +151,19 @@ def edit_blog(blog_id):
     )
 
 
-@app.route("/blog_details/<int:blog_id>")
-def blog_details(blog_id):
+@app.route("/blog/<slug>")
+def blog_details(slug):
     db = get_db()
     blog = db.execute(
         """
         SELECT blogs.*, categories.name as category_name 
         FROM blogs 
         LEFT JOIN categories ON blogs.category_id = categories.id 
-        WHERE blogs.id = ?
+        WHERE blogs.slug = ?
         """,
-        (blog_id,),
+        (slug,),
     ).fetchone()
+
     if not blog:
         return redirect("/homepage")
 
@@ -164,11 +171,11 @@ def blog_details(blog_id):
         row["name"]
         for row in db.execute(
             """
-    SELECT tags.name FROM tags 
-    INNER JOIN blog_tags ON tags.id = blog_tags.tag_id 
-    WHERE blog_tags.blog_id = ?
-    """,
-            (blog_id,),
+            SELECT tags.name FROM tags 
+            INNER JOIN blog_tags ON tags.id = blog_tags.tag_id 
+            WHERE blog_tags.blog_id = ?
+            """,
+            (blog["id"],),
         ).fetchall()
     ]
 
@@ -242,11 +249,14 @@ def dashboard():
 def create_blog():
     if "email" not in session:
         return redirect("/login")
+
     db = get_db()
     categories = db.execute("SELECT * FROM categories").fetchall()
     tags = db.execute("SELECT * FROM tags").fetchall()
+
     if request.method == "POST":
         title = request.form["title"]
+        slug = slugify(title)  # Generate a unique slug
         content = request.form["content"]
         author = session["name"]
         email = session["email"]
@@ -259,20 +269,15 @@ def create_blog():
             if image and image.filename != "":
                 filename = secure_filename(image.filename)
                 image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-                image_filename = filename  
-        # db.execute(
-        #     "INSERT INTO blogs (title, content, author, email, image_filename) VALUES (?, ?, ?, ?, ?)",
-        #     (title, content, author, email, image_filename),
-        # )
-        # db.commit()
+                image_filename = filename
+
         cursor = db.cursor()
         cursor.execute(
-            "INSERT INTO blogs (title, content, author, email, image_filename, category_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (title, content, author, email, image_filename, category_id),
+            "INSERT INTO blogs (title, slug, content, author, email, image_filename, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (title, slug, content, author, email, image_filename, category_id),
         )
-        blog_id = cursor.lastrowid  #  new blog's ID
+        blog_id = cursor.lastrowid  # Get the new blog's ID
 
-        # Insert tags into blog_tags 
         for tag_id in selected_tags:
             cursor.execute(
                 "INSERT INTO blog_tags (blog_id, tag_id) VALUES (?, ?)",
@@ -280,7 +285,7 @@ def create_blog():
             )
 
         db.commit()
-        return redirect("/homepage")
+        return redirect(f"/blog/{slug}")  # Redirect using slug
 
     return render_template("create_blog.html", categories=categories, tags=tags)
 
@@ -293,17 +298,16 @@ def homepage():
     return render_template("homepage.html", blogs=blogs)
 
 
-@app.route("/delete_blog/<int:blog_id>", methods=["POST"])
-def delete_blog(blog_id):
+@app.route("/delete_blog/<slug>", methods=["POST"])
+def delete_blog(slug):
     if "email" not in session:
         return redirect("/login")
 
     db = get_db()
-    blog = db.execute("SELECT * FROM blogs WHERE id = ?", (blog_id,)).fetchone()
+    blog = db.execute("SELECT * FROM blogs WHERE slug = ?", (slug,)).fetchone()
 
-    # Ensure the logged-in user is the author
     if blog and blog["email"] == session["email"]:
-        db.execute("DELETE FROM blogs WHERE id = ?", (blog_id,))
+        db.execute("DELETE FROM blogs WHERE slug = ?", (slug,))
         db.commit()
 
     return redirect("/homepage")
